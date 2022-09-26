@@ -21,7 +21,7 @@ The focus of the security review was on the following:
 
 **Severity:** High
 
-**Context:** [`UnstoppableLender.sol#L40`](https://github.com/actuallink)
+**Context:** [`UnstoppableLender.sol#L40`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L40)
 
 **Description:**
 Use of strict equalities that can be easily manipulated by an attacker.
@@ -59,7 +59,7 @@ contract UnstoppableLender {
 
 **Severity:** High
 
-**Context:** [`UnstoppableLender.sol#L26-31`](https://github.com/actuallink)
+**Context:** [`UnstoppableLender.sol#L26-31`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L26-L31)
 
 **Description:**
 A state variable is changed after a contract uses call.value. The attacker uses a fallback function—which is automatically executed after Token is transferred from the targeted contract—to execute the vulnerable function again, before the state variable is changed.
@@ -106,7 +106,7 @@ contract Attack {
 
 **Severity:** Medium
 
-**Context:** [`UnstoppableLender.sol#L3`](https://github.com/actuallink), [`ReentrancyGuard.sol#L3`](https://github.com/actuallink) and [`IERC20.sol#L3`](https://github.com/actuallink)
+**Context:** [`UnstoppableLender.sol#L3`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L3), [`ReentrancyGuard.sol#L3`]() and [`IERC20.sol#L3`]()
 
 **Description:**
 `solc` frequently releases new compiler versions. Using an old version prevents access to new Solidity security checks. We also recommend avoiding complex `pragma` statement.
@@ -126,7 +126,7 @@ contract Attack {
 
 **Severity:** Low
 
-**Context:** [`UnstoppableLender.sol#L26-31`](https://github.com/actuallink) and [`UnstoppableLender.sol#L33-48`](https://github.com/actuallink)
+**Context:** [`UnstoppableLender.sol#L26-31`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L26-L31) and [`UnstoppableLender.sol#L33-48`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L33-L48)
 
 **Description:**
 The return value of an external transfer/transferFrom call is not checked

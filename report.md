@@ -5,7 +5,7 @@ Truster is a [damnn vulnerable defi challenge](https://www.damnvulnerabledefi.xy
 # Introduction
 
 <!-- TODO  -->
-Unstoppable offers flash loans of DVT tokens for free, currently the pool has 1 milion DVT tokens in balance.
+Truster offers flash loans of DVT tokens for free, currently the pool has 1 milion DVT tokens in balance.
 
 The focus of the security review was on the following:
 

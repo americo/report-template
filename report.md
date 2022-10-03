@@ -1,11 +1,11 @@
-# Unstoppable
+# Naive Receiver
 
-Unstoppable is a [damnn vulnerable defi challenge](https://www.damnvulnerabledefi.xyz/challenges/1.html), there's a lending pool with a million DVT tokens in balance, offering flash loans for free.
+Naive Receiver is a [damnn vulnerable defi challenge](https://www.damnvulnerabledefi.xyz/challenges/1.html), There's a lending pool offering quite expensive flash loans of Ether, which has 1000 ETH in balance.
 
 # Introduction
 
 <!-- TODO  -->
-Unstoppable offers flash loans of DVT tokens for free.
+Unstoppable offers quite expensive flash loans of ETH.
 
 The focus of the security review was on the following:
 
@@ -17,134 +17,44 @@ The focus of the security review was on the following:
 # Findings 
 
 ## High Risk
-### Dangerous strict equalities
+### Lack of validation of the amount to be borrowed
 
 **Severity:** High
 
-**Context:** [`UnstoppableLender.sol#L40`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L40)
+**Context:** [`NaiveReceiverLenderPool.sol#L21-L41`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/naive-receiver/NaiveReceiverLenderPool.sol#L21-L41)
 
 **Description:**
-Use of strict equalities that can be easily manipulated by an attacker.
+Using the function `flashLoan` is possible to set borrower address and the amount to borrow, the borrower address have to be a `FlashLoanReceiver` contract address deployed by the user, and the amount can be any, because there is no validation for the amount to be borrowed.
 
-If an attacker transfer DVT token to the contract without using the `depositTokens()` function, the poolBalance doesn't change and the assert at line 40 returns false, consequently it's impossible to flash loan.
-```solidity
-contract UnstoppableLender {
-    ...
-    function depositTokens(uint256 amount) external nonReentrant {
-        require(amount > 0, "Must deposit at least one token");
-        // Transfer token from sender. Sender must have first approved them.
-        damnValuableToken.transferFrom(msg.sender, address(this), amount);
-        poolBalance = poolBalance + amount;
-    }
-    ...
-    function flashLoan(uint256 borrowAmount) external nonReentrant {
-        ...
-        // Ensured by the protocol via the `depositTokens` function
-        assert(poolBalance == balanceBefore);
-
-        damnValuableToken.transfer(msg.sender, borrowAmount);
-        ...
-    }
-    ...
-}
-```
-
-**Recommendation:**
-```diff
-+Don't use strict equality to determine if a pool has same balance.
-- ...
-```
-
-### Reentrancy
-
-**Severity:** High
-
-**Context:** [`UnstoppableLender.sol#L26-31`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L26-L31)
-
-**Description:**
-A state variable is changed after a contract uses call.value. The attacker uses a fallback function—which is automatically executed after Token is transferred from the targeted contract—to execute the vulnerable function again, before the state variable is changed.
-Abusing this vulnerability I created an exploit that makes 2 deposits, and only 1 is updated in the pool balance, and that makes us break flash loan functionality.
-
-```solidity
-contract UnstoppableLender {
-    ...
-    function depositTokens(uint256 amount) external nonReentrant {
-        ...
-        damnValuableToken.transferFrom(msg.sender, address(this), amount);
-        poolBalance = poolBalance + amount;
-        ...
-    }
-    ...
-}
-
-contract Attack {
-    UnstoppableLender public unstoppableLender; 
-    
-    constructor(address _unstoppableLenderAddress) {
-        unstoppableLender = UnstoppableLender(_unstoppableLenderAddress);
-    }
-
-    fallback() external payable {
-        unstoppableLender.depositTokens(10);
-    }
-
-    function attack() external payable {
-        unstoppableLender.depositTokens(10);
-        unstoppableLender.flashLoan(10);
-    }
-}
-```
-
-**Recommendation:**
-```diff
-+Ensure all state changes happen before calling external contracts.
-- ...
-```
-
-## Medium Risk
-### Incorrect versions of Solidity
-
-**Severity:** Medium
-
-**Context:** [`UnstoppableLender.sol#L3`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L3), [`ReentrancyGuard.sol#L3`]() and [`IERC20.sol#L3`]()
-
-**Description:**
-`solc` frequently releases new compiler versions. Using an old version prevents access to new Solidity security checks. We also recommend avoiding complex `pragma` statement.
-
-**Recommendation:**
-```diff
-+Deploy with any of the following Solidity versions:
-+ 0.5.16 - 0.5.17
-+ 0.6.11 - 0.6.12
-+ 0.7.5 - 0.7.6
-+ 0.8.4 - 0.8.7 Use a simple pragma version that allows any of these versions. Consider using the latest version of Solidity for testing.
-- ...
-```
-
-## Low Risk
-### Unchecked transfer
-
-**Severity:** Low
-
-**Context:** [`UnstoppableLender.sol#L26-31`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L26-L31) and [`UnstoppableLender.sol#L33-48`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/unstoppable/UnstoppableLender.sol#L33-L48)
-
-**Description:**
-The return value of an external transfer/transferFrom call is not checked
+If an attacker makes an flash loan setting victim `FlashLoanReceiver` contract address and `amount` 0, the victim will borrow 0 ETH and pay 1 ETH as fee.
+Due to the lack of any restrictions, the attacker can do this as many times as he wants until he steals all the ETH from the victim's contract.
 
 
 ```solidity
-contract UnstoppableLender {
+contract NaiveReceiverLenderPool {
     ...
-    function depositTokens(uint256 amount) external nonReentrant {
-        ...
-        damnValuableToken.transferFrom(msg.sender, address(this), amount);
-        ...
-    }
+    uint256 private constant FIXED_FEE = 1 ether; // not the cheapest flash loan
     ...
-    function flashLoan(uint256 borrowAmount) external nonReentrant {
-        ...
-        damnValuableToken.transfer(msg.sender, borrowAmount);
-        ...
+    function flashLoan(address borrower, uint256 borrowAmount) external nonReentrant {
+
+        uint256 balanceBefore = address(this).balance;
+        require(balanceBefore >= borrowAmount, "Not enough ETH in pool");
+
+
+        require(borrower.isContract(), "Borrower must be a deployed contract");
+        // Transfer ETH and handle control to receiver
+        borrower.functionCallWithValue(
+            abi.encodeWithSignature(
+                "receiveEther(uint256)",
+                FIXED_FEE
+            ),
+            borrowAmount
+        );
+        
+        require(
+            address(this).balance >= balanceBefore + FIXED_FEE,
+            "Flash loan hasn't been paid back"
+        );
     }
     ...
 }
@@ -152,6 +62,8 @@ contract UnstoppableLender {
 
 **Recommendation:**
 ```diff
-+Ensure that the transfer/transferFrom return value is checked.
++ Implement validation for the amount to be borrowed, must be greater than zero.
++ Validate if the person making the flash loan owns the `FlashLoanReceiver` contract.
 - ...
 ```
+

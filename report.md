@@ -12,7 +12,7 @@ The focus of the security review was on the following:
 1. Ensure that the system is implemented consistently with the intended functionality, and without unintended edge cases.
 2. Identify known vulnerabilities particular to smart contract systems, as outlined in our [Smart Contract Best Practices](https://consensys.github.io/smart-contract-best-practices/), and the [Smart Contract Weakness Classification Registry](https://swcregistry.io/).
 
-*Disclaimer:* This security review does not guarantee against a hack. It is a snapshot in time of brink according to the specific commit by a three person team. Any modifications to the code will require a new security review.
+*Disclaimer:* This security review does not guarantee against a hack. It is a snapshot in time of brink according to the specific commit by a one person. Any modifications to the code will require a new security review.
 
 # Findings 
 
